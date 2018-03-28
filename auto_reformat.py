@@ -17,7 +17,11 @@ def rotateSlice(sliceId, sliceSelector, lrSlider, paSlider, isSlider, offsetSlid
 	isSlider.setValue(isValue)
 	offsetSlider.setValue(offsetValue)
 
+
 def export():
+
+	import vtk.util.numpy_support as supp
+
 	lm = slicer.app.layoutManager()
 	redWidget = lm.sliceWidget("Red")
 	redController = redWidget.sliceController()
@@ -32,37 +36,54 @@ def export():
 	dataVolume = slicer.mrmlScene.GetNodeByID(dataVolumeID)
 	labelVolume = slicer.mrmlScene.GetNodeByID(labelVolumeID)
 
-	# Immagine con solo il volume MR / ecografia
-	compositeNode.SetBackgroundVolumeID(dataVolume.GetID())
-	compositeNode.SetForegroundVolumeID(None)
-	redController.setLabelMapHidden(True)
+	compositeNode.SetLabelVolumeID(None)
 
-	# Salvo l'immagine png
+	# Salvo l'immagine 
 	immagine = redWidget.imageDataConnection()
+
+	# Calcolo un nuovo volume con un solo layer -> immagine / label
+	blend = redLogic.GetBlend()
+	img = blend.GetOutput()
+	arrayData = img.GetPointData().GetArray(0)
+	arrayImg = supp.vtk_to_numpy(arrayData)
+	arrayImg = arrayImg.reshape(img.GetDimensions()[0], img.GetDimensions()[1], -1)
+		
+	#volumeNode.SetImageDataConnection(immagine)
+	#slicer.util.saveNode(volumeNode, '/Users/eros/Desktop/volume.nrrd')
+
 	writer = vtk.vtkPNGWriter()
 	writer.SetInputConnection(immagine)
-	writer.SetFileName("/home/eros/Desktop/prova.png")
+	writer.SetFileName("/Users/eros/Desktop/prova.png")
 	writer.Write()
+	
 
-	# Salvo le label
+	### ----------->>>>  volume.SetNodeReferenceID('', slice.GetID())
+
+	#############
+	# Salvo il volume della Label 2-D
 	compositeNode.SetBackgroundVolumeID(None)
-	redController.setLabelMapHidden(False)
-
+	compositeNode.SetLabelVolumeID(labelVolumeID)
+	volLabel = slicer.vtkMRMLScalarVolumeNode()
+	
 	immagineLabel = redWidget.imageDataConnection()
 	writer.SetInputConnection(immagineLabel)
-	writer.SetFileName("/home/eros/Desktop/prova-label.png")
+	writer.SetFileName("/Users/eros/Desktop/prova-label.png")
 	writer.Write()
+	
+	#labelVolume = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLLabelMapVolumeNode')
+	#labelVolume.
+	#slicer.util.saveNode(labelVolume, '/Users/eros/Desktop/volume-label.nrrd')
+	#############
 
-	# Per ottenere le coordinate
-	sliceNode = redLogic.GetSliceNode()
-	sliceNode.GetSliceToRAS()
-
-	# Creo il volume
-	volumeNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLScalarVolumeNode')
-	volumeNode.SetImageDataConnection(immagine)
-
-	volumeLabelNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLScalarVolumeNode')
-	volumeLabelNode.SetImageDataConnection(immagineLabel)
+	# Creo il nuovo volume con solamente uno slice
+	'''
+	nodeName = "Volume"
+	imageSize = redLogic.GetSliceNode().GetDimensions()
+	voxelType = vtk.VTK_UNSIGNED_INT
+	imageOrigin = [0.0, 0.0, 0.0]
+	imageSpacing = [1.0, 1.0, 1.0]
+	imageDirections = [[1,0,0], [0,1,0], [0,0,1]]
+	'''
 
 
 # Accedo al modulo Reformat integrato in 3D Slicer
@@ -89,9 +110,11 @@ offsetWidget = slicer.util.findChild(reformatWidget, "OffsetSlidersGroupBox")
 offsetSlider = slicer.util.findChild(offsetWidget, "OffsetSlider")
 
 rotateSlice(0, sliceSelector, lrSlider, paSlider, isSlider, offsetSlider)
+reformatWidget.centerSliceNode()
 rotateSlice(1, sliceSelector, lrSlider, paSlider, isSlider, offsetSlider)
+reformatWidget.centerSliceNode()
 rotateSlice(2, sliceSelector, lrSlider, paSlider, isSlider, offsetSlider)
-
+reformatWidget.centerSliceNode()
 
 
 
