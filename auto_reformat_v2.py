@@ -20,8 +20,6 @@ def rotateSlice(sliceId, sliceSelector, lrSlider, paSlider, isSlider, offsetSlid
 
 def export():
 
-	import vtk.util.numpy_support as supp
-
 	lm = slicer.app.layoutManager()
 	redWidget = lm.sliceWidget("Red")
 	redController = redWidget.sliceController()
@@ -31,10 +29,10 @@ def export():
 
 	# Ottengo informazioni riguardo i volumi mostrati nella RedView
 	dataVolumeID = compositeNode.GetBackgroundVolumeID()
-	labelVolumeID = compositeNode.GetLabelVolumeID()
+	#labelVolumeID = compositeNode.GetLabelVolumeID()
 
 	dataVolume = slicer.mrmlScene.GetNodeByID(dataVolumeID)
-	labelVolume = slicer.mrmlScene.GetNodeByID(labelVolumeID)
+	#labelVolume = slicer.mrmlScene.GetNodeByID(labelVolumeID)
 
 	compositeNode.SetLabelVolumeID(None)
 
@@ -47,7 +45,20 @@ def export():
 	arrayImg = arrayImg.reshape(img.GetDimensions()[0], img.GetDimensions()[1], -1)
 	'''
 
+	sliceNode = redLogic.GetSliceNode()
+
 	transform = sliceNode.GetSliceToRAS()  # Matrice della trasformazione dello slice
+	
+	#Centro lo slice
+	reformat = slicer.modules.reformat.logic()
+	bounds = [0, 0, 0, 0, 0, 0]
+	center = [0, 0, 0]
+	reformat.GetVolumeBounds(sliceNode, bounds)
+	reformat.GetCenterFromBounds(bounds, center)
+	transform.SetElement(0, 3, center[0])
+	transform.SetElement(1, 3, center[1])	
+	transform.SetElement(2, 3, center[2])
+
 	reslice = vtk.vtkImageReslice()
 	reslice.SetInputConnection(dataVolume.GetImageDataConnection())
 	reslice.SetOutputDimensionality(2)
@@ -56,6 +67,25 @@ def export():
 	reslice.SetResliceAxes(transform)
 	reslice.Update()
 
+	sliceNode.UpdateMatrices()
+
+	shifter = vtk.vtkImageShiftScale()
+	shifter.SetOutputScalarTypeToUnsignedShort()
+	shifter.SetInputData(reslice.GetOutput())
+	imageViewer = vtk.vtkImageViewer2()
+	imageViewer.SetInputConnection(shifter.GetOutputPort())  # provare con reslice
+	renderWindowInteractor = vtk.vtkRenderWindowInteractor()
+	imageViewer.SetupInteractor(renderWindowInteractor);
+	imageViewer.Render()
+	#imageViewer.GetRenderer().ResetCamera()
+	#imageViewer.Render()
+	 
+	renderWindowInteractor.Start()
+
+	writer = vtk.vtkPNGWriter()
+	writer.SetFileName('/Users/eros/Desktop/prova.png')
+	writer.SetInputConnection(shifter.GetOutputPort())
+	writer.Write()
 	'''
 	immagine = reslice.GetOutput()
 	arrayData = immagine.GetPointData().GetArray(0)
@@ -72,14 +102,8 @@ def export():
 	np.savetxt("/Users/eros/Desktop/img.csv", arrayImg, delimiter=",")
 	'''
 
-	wti = vtk.vtkWindowToImageFilter()
-	wti.SetInput(redView.renderWindow())
-	wti.Update()
-	v = vtk.vtkImageViewer()
-	v.SetColorWindow(65536)
-	v.SetColorLevel(128)
-	v.SetInputConnection(wti.GetOutputPort())
-	v.Render()
+	
+
 # Accedo al modulo Reformat integrato in 3D Slicer
 
 reformat = slicer.modules.reformat
